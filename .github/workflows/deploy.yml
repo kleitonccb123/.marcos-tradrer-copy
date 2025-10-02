@@ -1,10 +1,9 @@
-# .github/workflows/deploy.yml
 name: Deploy to Hostinger (FTPS)
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: [ "main" ]         # deploy em todo push na main
+  workflow_dispatch:              # permite rodar manualmente pelo botão "Run workflow"
 
 concurrency:
   group: hostinger-deploy
@@ -13,6 +12,7 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,6 +29,7 @@ jobs:
       - name: Build (Vite)
         run: npm run build
 
+      # Cria .htaccess dentro de dist para SPA/React Router
       - name: Ensure .htaccess for SPA
         run: |
           mkdir -p dist
@@ -41,31 +42,31 @@ jobs:
           RewriteRule . /index.html [L]
           EOF
 
-      - name: Sanity check (dist)
-        run: |
-          test -f dist/index.html || { echo "dist/index.html não existe"; exit 1; }
-          ls -la dist | head -n 50
-
-      - name: Validate required secrets
+      # Verificações rápidas antes do deploy
+      - name: Sanity check (dist exists + secrets)
         shell: bash
         run: |
-          [[ -n "${{ secrets.FTP_SERVER }}" ]]   || { echo "Defina o secret FTP_SERVER"; exit 1; }
-          [[ -n "${{ secrets.FTP_USERNAME }}" ]] || { echo "Defina o secret FTP_USERNAME"; exit 1; }
-          [[ -n "${{ secrets.FTP_PASSWORD }}" ]] || { echo "Defina o secret FTP_PASSWORD"; exit 1; }
-          [[ -n "${{ secrets.FTP_DIR }}" ]]      || { echo "Defina o secret FTP_DIR (/public_html ou /domains/SEU_DOMINIO/public_html)"; exit 1; }
-          echo "Secrets OK"
+          test -f dist/index.html || { echo "ERRO: dist/index.html não existe. O build falhou?"; exit 1; }
 
+          [[ -n "${{ secrets.FTP_SERVER }}" ]]   || { echo "ERRO: defina o secret FTP_SERVER"; exit 1; }
+          [[ -n "${{ secrets.FTP_USERNAME }}" ]] || { echo "ERRO: defina o secret FTP_USERNAME"; exit 1; }
+          [[ -n "${{ secrets.FTP_PASSWORD }}" ]] || { echo "ERRO: defina o secret FTP_PASSWORD"; exit 1; }
+          [[ -n "${{ secrets.FTP_DIR }}" ]]      || { echo "ERRO: defina o secret FTP_DIR (/public_html/ ou /domains/SEU_DOMINIO/public_html/)"; exit 1; }
+
+          echo "dist OK e secrets OK"
+
+      # DEPLOY via FTPS (requer barras finais em local-dir e server-dir)
       - name: Deploy via FTPS to Hostinger
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4   # << versão correta/pinada
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server:     ${{ secrets.FTP_SERVER }}
           username:   ${{ secrets.FTP_USERNAME }}
           password:   ${{ secrets.FTP_PASSWORD }}
           port:       ${{ secrets.FTP_PORT || 21 }}
           protocol:   ftps
-          local-dir:  dist
-          server-dir: ${{ secrets.FTP_DIR }}
-          dangerous-clean-slate: true
+          local-dir:  ./dist/                   # precisa terminar com /
+          server-dir: ${{ secrets.FTP_DIR }}    # coloque / no final no secret (ex: /public_html/)
+          dangerous-clean-slate: true           # limpa a pasta remota antes de enviar
           exclude: |
             **/.git*
             **/.github/**
