@@ -2,13 +2,16 @@ name: Deploy to Hostinger (FTPS)
 
 on:
   push:
-    branches: [ "main" ]   # deploy em todo push na main
-  workflow_dispatch:        # permite rodar manualmente
+    branches: [ "main" ]            # deploy em todo push na main
+  workflow_dispatch:                 # permite rodar manualmente
+
+concurrency:
+  group: hostinger-deploy
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -17,15 +20,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "18"
+          cache: "npm"
 
       - name: Install deps
         run: npm ci
 
-      - name: Build
+      - name: Build (Vite)
         run: npm run build
 
-      - name: Add .htaccess for SPA (React Router)
+      - name: Ensure .htaccess for SPA (React Router)
         run: |
+          mkdir -p dist
           cat > dist/.htaccess <<'EOF'
           RewriteEngine On
           RewriteBase /
@@ -35,14 +40,34 @@ jobs:
           RewriteRule . /index.html [L]
           EOF
 
+      - name: Sanity check (dist contents)
+        run: |
+          test -f dist/index.html || (echo "index.html não encontrado em dist/" && exit 1)
+          ls -la dist | head -n 50
+
+      - name: Validate required secrets
+        run: |
+          : "${{ secrets.FTP_SERVER?Defina o secret FTP_SERVER }}"
+          : "${{ secrets.FTP_USERNAME?Defina o secret FTP_USERNAME }}"
+          : "${{ secrets.FTP_PASSWORD?Defina o secret FTP_PASSWORD }}"
+          : "${{ secrets.FTP_DIR?Defina o secret FTP_DIR (ex: /public_html ou /domains/SEU_DOMINIO/public_html) }}"
+          echo "Secrets OK"
+
+      # >>> AQUI ESTAVA O ERRO: use o repositório/versão com a caixa correta <<<
       - name: Deploy via FTPS to Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ secrets.FTP_PORT }}
+          port: ${{ secrets.FTP_PORT || 21 }}
           protocol: ftps
           local-dir: dist
           server-dir: ${{ secrets.FTP_DIR }}
-          dangerous-clean-slate: true   # limpa a pasta remota antes de enviar
+          # Evita manter lixo antigo; CUIDADO para apontar para a pasta certa!
+          dangerous-clean-slate: true
+          exclude: |
+            **/.git*
+            **/.github/**
+            node_modules/**
+            **/*.map
