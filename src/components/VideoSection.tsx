@@ -17,7 +17,7 @@ export const VideoSection = () => {
           <div className="relative aspect-video bg-background rounded-2xl overflow-hidden">
             <iframe
               className="w-full h-full"
-              src="https://www.youtube.com/embed/_yP-FbnN4vY?start=2"
+              src="watch?v=WysyD-8d63w&t=1s"
               title="Copy Trader PricePro Tutorial"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
