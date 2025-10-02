@@ -1,3 +1,4 @@
+# .github/workflows/deploy.yml
 name: Deploy to Hostinger (FTPS)
 
 on:
@@ -16,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node 18 + cache
         uses: actions/setup-node@v4
         with:
           node-version: "18"
@@ -55,14 +56,14 @@ jobs:
           echo "Secrets OK"
 
       - name: Deploy via FTPS to Hostinger
-        uses: SamKirkland/FTP-Deploy-Action@v4
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4   # << versão correta/pinada
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: ${{ secrets.FTP_PORT || 21 }}
-          protocol: ftps
-          local-dir: dist
+          server:     ${{ secrets.FTP_SERVER }}
+          username:   ${{ secrets.FTP_USERNAME }}
+          password:   ${{ secrets.FTP_PASSWORD }}
+          port:       ${{ secrets.FTP_PORT || 21 }}
+          protocol:   ftps
+          local-dir:  dist
           server-dir: ${{ secrets.FTP_DIR }}
           dangerous-clean-slate: true
           exclude: |
